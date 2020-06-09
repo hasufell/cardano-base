@@ -4,6 +4,7 @@
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
 
 -- | Implementation of short hashing algorithm, suitable for testing as
 -- it's not very collision-resistant.
@@ -28,6 +29,10 @@ data MD5Prefix (n :: Nat)
 instance (KnownNat n, CmpNat n 33 ~ 'LT) => HashAlgorithm (MD5Prefix n) where
   hashAlgorithmName p = "md5_prefix_" <> show (sizeHash p)
   sizeHash _ = fromIntegral $ natVal (Proxy :: Proxy n)
+
+instance HashAlgorithm ShortHash where
+  type SizeHash ShortHash = 8
+  hashAlgorithmName _ = "md5_short"
   digest p =
     B.take (fromIntegral (sizeHash p)) .
       BA.convert .
