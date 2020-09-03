@@ -116,10 +116,8 @@ instance (NaCl.SodiumDSIGNAlgorithm d, Typeable d) => KESAlgorithm (SingleKES d)
     --
     -- forgetting
     --
-
-    -- TODO: to implement this, we
-    -- should know how to forget DSIGN keys.
-    forgetSignKeyKES = const $ return ()
+    forgetSignKeyKES (SignKeySingleKES sk) =
+      NaCl.naclForgetSignKeyDSIGN (Proxy @d) sk
 
     --
     -- raw serialise/deserialise
