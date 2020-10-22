@@ -1,10 +1,15 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
 
 -- | Abstract hashing functionality.
 module Cardano.Crypto.Hash.Class
   ( HashAlgorithm (..)
+  , sizeHash
   , ByteString
   , Hash(..)
 
@@ -39,11 +44,13 @@ module Cardano.Crypto.Hash.Class
   )
 where
 
+import Control.Monad (join)
 import Data.List (foldl')
 import Data.Maybe (maybeToList)
 import Data.Proxy (Proxy (..))
 import Data.Typeable (Typeable)
 import GHC.Generics (Generic)
+import GHC.TypeLits (Nat, KnownNat, natVal)
 
 import           Data.Word (Word8)
 import qualified Data.Bits as Bits
@@ -68,26 +75,30 @@ import qualified Data.Aeson.Encoding as Aeson
 
 import           Control.DeepSeq (NFData)
 
-import           Cardano.Prelude (NoUnexpectedThunks)
+import           NoThunks.Class (NoThunks)
+
 import           Cardano.Binary
                    (Encoding, FromCBOR (..), ToCBOR (..), Size, decodeBytes,
                     serializeEncoding')
 
+import qualified Cardano.Prelude as P
 
-class Typeable h => HashAlgorithm h where
+class (KnownNat (SizeHash h), Typeable h) => HashAlgorithm h where
       --TODO: eliminate this Typeable constraint needed only for the ToCBOR
       -- the ToCBOR should not need it either
+  -- size of hash digest
+  type SizeHash h :: Nat
 
   hashAlgorithmName :: proxy h -> String
 
-  -- | The size in bytes of the output of 'digest'
-  sizeHash :: proxy h -> Word
-
   digest :: proxy h -> ByteString -> ByteString
 
+-- | The size in bytes of the output of 'digest'
+sizeHash :: forall h proxy. HashAlgorithm h => proxy h -> Word
+sizeHash _ = fromInteger (natVal (Proxy @(SizeHash h)))
 
 newtype Hash h a = UnsafeHash ShortByteString
-  deriving (Eq, Ord, Generic, NFData, NoUnexpectedThunks)
+  deriving (Eq, Ord, Generic, NFData, NoThunks)
 
 
 --
@@ -142,13 +153,6 @@ hashFromBytes bytes
   | otherwise
   = Nothing
 
-
--- | The representation of the hash as bytes, as a 'ShortByteString'.
---
-hashToBytesShort :: Hash h a -> ShortByteString
-hashToBytesShort (UnsafeHash h) = h
-
-
 -- | Make a hash from it bytes representation, as a 'ShortByteString'.
 --
 -- It must be a a bytestring of the correct length, as given by 'sizeHash'.
@@ -161,6 +165,12 @@ hashFromBytesShort bytes
 
   | otherwise
   = Nothing
+
+
+-- | The representation of the hash as bytes, as a 'ShortByteString'.
+--
+hashToBytesShort :: Hash h a -> ShortByteString
+hashToBytesShort (UnsafeHash h) = h
 
 
 --
@@ -203,14 +213,7 @@ hashToBytesAsHex = Base16.encode . hashToBytes
 -- is invalid hex. The whole byte string must be valid hex, not just a prefix.
 --
 hashFromBytesAsHex :: HashAlgorithm h => ByteString -> Maybe (Hash h a)
-hashFromBytesAsHex hexrep
-  | (bytes, trailing) <- Base16.decode hexrep
-  , BS.null trailing
-  = hashFromBytes bytes
-
-  | otherwise
-  = Nothing
-
+hashFromBytesAsHex = join . either (const Nothing) (Just . hashFromBytes) . P.decodeEitherBase16
 
 instance Show (Hash h a) where
   show = show . hashToStringAsHex
@@ -242,10 +245,9 @@ hashToText = Text.decodeLatin1 . hashToBytesAsHex
 
 parseHash :: HashAlgorithm crypto => Text -> Aeson.Parser (Hash crypto a)
 parseHash t =
-    case Base16.decode (Text.encodeUtf8 t) of
-      (bytes, trailing)
-        | BS.null trailing -> maybe badSize return (hashFromBytes bytes)
-        | otherwise        -> badHex
+    case P.decodeEitherBase16 (Text.encodeUtf8 t) of
+      Right bytes -> maybe badSize return (hashFromBytes bytes)
+      Left _ -> badHex
   where
     badHex :: Aeson.Parser b
     badHex = fail "Hashes are expected in hex encoding"

@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE DerivingVia #-}
@@ -15,10 +16,11 @@ module Cardano.Crypto.DSIGN.Ed448
   )
 where
 
+import Control.DeepSeq (NFData)
 import Data.ByteArray as BA (ByteArrayAccess, convert)
 import GHC.Generics (Generic)
+import NoThunks.Class (NoThunks, InspectHeap(..))
 
-import Cardano.Prelude (NFData, NoUnexpectedThunks, UseIsNormalForm(..))
 import Cardano.Binary (FromCBOR (..), ToCBOR (..))
 
 import Crypto.Error (CryptoFailable (..))
@@ -32,6 +34,11 @@ import Cardano.Crypto.Util (SignableRepresentation(..))
 data Ed448DSIGN
 
 instance DSIGNAlgorithm Ed448DSIGN where
+    type SeedSizeDSIGN Ed448DSIGN = 57
+    -- | Goldilocks points are 448 bits long
+    type SizeVerKeyDSIGN  Ed448DSIGN = 57
+    type SizeSignKeyDSIGN Ed448DSIGN = 57
+    type SizeSigDSIGN     Ed448DSIGN = 114
 
     --
     -- Key and signature types
@@ -40,16 +47,16 @@ instance DSIGNAlgorithm Ed448DSIGN where
     newtype VerKeyDSIGN Ed448DSIGN = VerKeyEd448DSIGN PublicKey
         deriving (Show, Eq, Generic, ByteArrayAccess)
         deriving newtype NFData
-        deriving NoUnexpectedThunks via UseIsNormalForm PublicKey
+        deriving NoThunks via InspectHeap PublicKey
 
     newtype SignKeyDSIGN Ed448DSIGN = SignKeyEd448DSIGN SecretKey
         deriving (Show, Eq, Generic, ByteArrayAccess)
         deriving newtype NFData
-        deriving NoUnexpectedThunks via UseIsNormalForm SecretKey
+        deriving NoThunks via InspectHeap SecretKey
 
     newtype SigDSIGN Ed448DSIGN = SigEd448DSIGN Signature
         deriving (Show, Eq, Generic, ByteArrayAccess)
-        deriving NoUnexpectedThunks via UseIsNormalForm Signature
+        deriving NoThunks via InspectHeap Signature
 
     --
     -- Metadata and basic key operations
@@ -80,7 +87,6 @@ instance DSIGNAlgorithm Ed448DSIGN where
     -- Key generation
     --
 
-    seedSizeDSIGN _  = 57
     genKeyDSIGN seed =
         let sk = runMonadRandomWithSeed seed Ed448.generateSecretKey
          in SignKeyEd448DSIGN sk
@@ -88,11 +94,6 @@ instance DSIGNAlgorithm Ed448DSIGN where
     --
     -- raw serialise/deserialise
     --
-
-    -- | Goldilocks points are 448 bits long
-    sizeVerKeyDSIGN  _ = 57
-    sizeSignKeyDSIGN _ = 57
-    sizeSigDSIGN     _ = 114
 
     rawSerialiseVerKeyDSIGN   = BA.convert
     rawSerialiseSignKeyDSIGN  = BA.convert

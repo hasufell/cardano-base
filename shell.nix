@@ -36,11 +36,15 @@ let
 
     tools = {
       cabal = "3.2.0.0";
+      haskell-language-server = "0.5.1";
     };
 
     # Prevents cabal from choosing alternate plans, so that
     # *all* dependencies are provided by Nix.
     exactDeps = false;
+
+    NIX_SSL_CERT_FILE = "/etc/ssl/certs/ca-bundle.crt";
+    SSL_CERT_FILE = "/etc/ssl/certs/ca-bundle.crt";
 
     inherit withHoogle;
   };

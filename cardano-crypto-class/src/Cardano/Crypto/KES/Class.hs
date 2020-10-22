@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -5,6 +6,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeApplications #-}
 
 -- | Abstract key evolving signatures.
 module Cardano.Crypto.KES.Class
@@ -43,14 +45,15 @@ import Data.Typeable (Typeable)
 import GHC.Exts (Constraint)
 import GHC.Generics (Generic)
 import GHC.Stack
+import GHC.TypeLits (Nat, KnownNat, natVal)
+import NoThunks.Class (NoThunks)
 
-import Cardano.Prelude (NoUnexpectedThunks)
 import Cardano.Binary (Decoder, decodeBytes, Encoding, encodeBytes, Size, withWordSize)
 
-import Cardano.Crypto.Seed
 import Cardano.Crypto.Util (Empty)
 import Cardano.Crypto.Hash.Class (HashAlgorithm, Hash, hashWith)
 
+import qualified Cardano.Crypto.Libsodium as NaCl
 
 class ( Typeable v
       , Show (VerKeyKES v)
@@ -58,12 +61,14 @@ class ( Typeable v
       , Show (SignKeyKES v)
       , Show (SigKES v)
       , Eq (SigKES v)
-      , NoUnexpectedThunks (SigKES     v)
-      , NoUnexpectedThunks (SignKeyKES v)
-      , NoUnexpectedThunks (VerKeyKES  v)
+      , NoThunks (SigKES v)
+      , NoThunks (SignKeyKES v)
+      , NoThunks (VerKeyKES v)
+      , KnownNat (SeedSizeKES v)
       )
       => KESAlgorithm v where
 
+  type SeedSizeKES v :: Nat
 
   --
   -- Key and signature types
@@ -155,10 +160,11 @@ class ( Typeable v
   -- Key generation
   --
 
-  genKeyKES :: Seed -> SignKeyKES v
+  genKeyKES :: NaCl.MLockedSizedBytes (SeedSizeKES v) -> SignKeyKES v
 
   -- | The upper bound on the 'Seed' size needed by 'genKeyKES'
   seedSizeKES :: proxy v -> Word
+  seedSizeKES _ = fromInteger (natVal (Proxy @(SeedSizeKES v)))
 
   --
   -- Secure forgetting
@@ -261,7 +267,7 @@ newtype SignedKES v a = SignedKES {getSig :: SigKES v}
 deriving instance KESAlgorithm v => Show (SignedKES v a)
 deriving instance KESAlgorithm v => Eq   (SignedKES v a)
 
-instance KESAlgorithm v => NoUnexpectedThunks (SignedKES v a)
+instance KESAlgorithm v => NoThunks (SignedKES v a)
   -- use generic instance
 
 signedKES

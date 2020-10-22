@@ -22,13 +22,14 @@ import Cardano.Crypto.DSIGN hiding (Signable)
 import Cardano.Crypto.Hash
 import Cardano.Crypto.KES
 import Cardano.Crypto.Util (SignableRepresentation(..))
+import qualified Cardano.Crypto.Libsodium as NaCl
 
 import Test.QuickCheck
 import Test.Tasty (TestTree, testGroup, adjustOption)
 import Test.Tasty.QuickCheck (testProperty, QuickCheckMaxSize(..))
 
 import Test.Crypto.Util hiding (label)
-
+import Test.Crypto.Instances ()
 
 --
 -- The list of all tests
@@ -49,9 +50,9 @@ tests =
 -- instance here.
 deriving instance Eq (SignKeyDSIGN d) => Eq (SignKeyKES (SimpleKES d t))
 
-deriving instance Eq (SignKeyDSIGN d)
+deriving instance Eq (NaCl.SodiumSignKeyDSIGN d)
                => Eq (SignKeyKES (SingleKES d))
-deriving instance (KESAlgorithm d, Eq (SignKeyKES d))
+deriving instance (KESAlgorithm d, NaCl.SodiumHashAlgorithm h, Eq (SignKeyKES d))
                => Eq (SignKeyKES (SumKES h d))
 
 testKESAlgorithm
@@ -147,10 +148,10 @@ testKESAlgorithm _p n =
       , testProperty "Sig"     $ prop_serialise_SigKES     @v
       ]
 
-    , testGroup "NoUnexpectedThunks"
-      [ testProperty "VerKey"  $ prop_no_unexpected_thunks @(VerKeyKES v)
-      , testProperty "SignKey" $ prop_no_unexpected_thunks @(SignKeyKES v)
-      , testProperty "Sig"     $ prop_no_unexpected_thunks @(SigKES v)
+    , testGroup "NoThunks"
+      [ testProperty "VerKey"  $ prop_no_thunks @(VerKeyKES v)
+      , testProperty "SignKey" $ prop_no_thunks @(SignKeyKES v)
+      , testProperty "Sig"     $ prop_no_thunks @(SigKES v)
       ]
     ]
 
@@ -362,9 +363,7 @@ instance KESAlgorithm v => Arbitrary (VerKeyKES v) where
   shrink = const []
 
 instance KESAlgorithm v => Arbitrary (SignKeyKES v) where
-  arbitrary = genKeyKES <$> arbitrarySeedOfSize seedSize
-    where
-      seedSize = seedSizeKES (Proxy :: Proxy v)
+  arbitrary = genKeyKES <$> arbitrary
   shrink = const []
 
 instance (KESAlgorithm v, ContextKES v ~ (), Signable v ~ SignableRepresentation)

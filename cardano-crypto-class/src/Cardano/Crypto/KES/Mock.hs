@@ -21,17 +21,17 @@ import Data.Word (Word64)
 import Data.Proxy (Proxy(..))
 import GHC.Generics (Generic)
 import GHC.TypeNats (Nat, KnownNat, natVal)
+import NoThunks.Class (NoThunks)
 
 import Control.Exception (assert)
 
 import Cardano.Binary (FromCBOR (..), ToCBOR (..))
-import Cardano.Prelude (NoUnexpectedThunks)
 
 import Cardano.Crypto.Hash
 import Cardano.Crypto.Seed
 import Cardano.Crypto.KES.Class
 import Cardano.Crypto.Util
-
+import Cardano.Crypto.Libsodium (mlsbToByteString)
 
 data MockKES (t :: Nat)
 
@@ -47,6 +47,7 @@ data MockKES (t :: Nat)
 -- keys. Mock KES is more suitable for a basic testnet, since it doesn't suffer
 -- from the performance implications of shuffling a giant list of keys around
 instance KnownNat t => KESAlgorithm (MockKES t) where
+    type SeedSizeKES (MockKES t) = 8
 
     --
     -- Key and signature types
@@ -54,17 +55,17 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
 
     newtype VerKeyKES (MockKES t) = VerKeyMockKES Word64
         deriving stock   (Show, Eq, Ord, Generic)
-        deriving newtype (NoUnexpectedThunks)
+        deriving newtype (NoThunks)
 
     data SignKeyKES (MockKES t) =
            SignKeyMockKES !(VerKeyKES (MockKES t)) !Period
         deriving stock    (Show, Eq, Ord, Generic)
-        deriving anyclass (NoUnexpectedThunks)
+        deriving anyclass (NoThunks)
 
     data SigKES (MockKES t) =
            SigMockKES !(Hash MD5 ()) !(SignKeyKES (MockKES t))
         deriving stock    (Show, Eq, Ord, Generic)
-        deriving anyclass (NoUnexpectedThunks)
+        deriving anyclass (NoThunks)
 
     --
     -- Metadata and basic key operations
@@ -114,9 +115,8 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
     -- Key generation
     --
 
-    seedSizeKES _ = 8
     genKeyKES seed =
-        let vk = VerKeyMockKES (runMonadRandomWithSeed seed getRandomWord64)
+        let vk = VerKeyMockKES (runMonadRandomWithSeed (mkSeedFromBytes $ mlsbToByteString seed) getRandomWord64)
          in SignKeyMockKES vk 0
 
 

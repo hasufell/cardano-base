@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE DerivingVia #-}
@@ -15,10 +16,11 @@ module Cardano.Crypto.DSIGN.Ed25519
   )
 where
 
+import Control.DeepSeq (NFData)
 import Data.ByteArray as BA (ByteArrayAccess, convert)
 import GHC.Generics (Generic)
+import NoThunks.Class (NoThunks, InspectHeap(..))
 
-import Cardano.Prelude (NFData, NoUnexpectedThunks, UseIsNormalForm(..))
 import Cardano.Binary (FromCBOR (..), ToCBOR (..))
 
 import Crypto.Error (CryptoFailable (..))
@@ -32,6 +34,13 @@ import Cardano.Crypto.Util (SignableRepresentation(..))
 data Ed25519DSIGN
 
 instance DSIGNAlgorithm Ed25519DSIGN where
+    type SeedSizeDSIGN Ed25519DSIGN = 32
+    -- | Ed25519 key size is 32 octets
+    -- (per <https://tools.ietf.org/html/rfc8032#section-5.1.6>)
+    type SizeVerKeyDSIGN  Ed25519DSIGN = 32
+    type SizeSignKeyDSIGN Ed25519DSIGN = 32
+    -- | Ed25519 signature size is 64 octets
+    type SizeSigDSIGN     Ed25519DSIGN = 64
 
     --
     -- Key and signature types
@@ -40,16 +49,16 @@ instance DSIGNAlgorithm Ed25519DSIGN where
     newtype VerKeyDSIGN Ed25519DSIGN = VerKeyEd25519DSIGN PublicKey
         deriving (Show, Eq, Generic, ByteArrayAccess)
         deriving newtype NFData
-        deriving NoUnexpectedThunks via UseIsNormalForm PublicKey
+        deriving NoThunks via InspectHeap PublicKey
 
     newtype SignKeyDSIGN Ed25519DSIGN = SignKeyEd25519DSIGN SecretKey
         deriving (Show, Eq, Generic, ByteArrayAccess)
         deriving newtype NFData
-        deriving NoUnexpectedThunks via UseIsNormalForm SecretKey
+        deriving NoThunks via InspectHeap SecretKey
 
     newtype SigDSIGN Ed25519DSIGN = SigEd25519DSIGN Signature
         deriving (Show, Eq, Generic, ByteArrayAccess)
-        deriving NoUnexpectedThunks via UseIsNormalForm Signature
+        deriving NoThunks via InspectHeap Signature
 
     --
     -- Metadata and basic key operations
@@ -80,7 +89,6 @@ instance DSIGNAlgorithm Ed25519DSIGN where
     -- Key generation
     --
 
-    seedSizeDSIGN _  = 32
     genKeyDSIGN seed =
         let sk = runMonadRandomWithSeed seed Ed25519.generateSecretKey
          in SignKeyEd25519DSIGN sk
@@ -88,13 +96,6 @@ instance DSIGNAlgorithm Ed25519DSIGN where
     --
     -- raw serialise/deserialise
     --
-
-    -- | Ed25519 key size is 32 octets
-    -- (per <https://tools.ietf.org/html/rfc8032#section-5.1.6>)
-    sizeVerKeyDSIGN  _ = 32
-    sizeSignKeyDSIGN _ = 32
-    -- | Ed25519 signature size is 64 octets
-    sizeSigDSIGN     _ = 64
 
     rawSerialiseVerKeyDSIGN   = BA.convert
     rawSerialiseSignKeyDSIGN  = BA.convert

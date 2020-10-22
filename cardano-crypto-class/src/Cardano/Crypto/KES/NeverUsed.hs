@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -11,9 +12,9 @@ module Cardano.Crypto.KES.NeverUsed
 where
 
 import GHC.Generics (Generic)
+import NoThunks.Class (NoThunks)
 
 import Cardano.Crypto.KES.Class
-import Cardano.Prelude (NoUnexpectedThunks)
 
 
 -- | KES never used
@@ -23,15 +24,16 @@ import Cardano.Prelude (NoUnexpectedThunks)
 data NeverKES
 
 instance KESAlgorithm NeverKES where
+  type SeedSizeKES NeverKES = 0
 
   data VerKeyKES  NeverKES = NeverUsedVerKeyKES
-      deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks)
+      deriving (Show, Eq, Ord, Generic, NoThunks)
 
   data SignKeyKES NeverKES = NeverUsedSignKeyKES
-      deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks)
+      deriving (Show, Eq, Ord, Generic, NoThunks)
 
   data SigKES     NeverKES = NeverUsedSigKES
-      deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks)
+      deriving (Show, Eq, Ord, Generic, NoThunks)
 
   algorithmNameKES _ = "never"
 
@@ -43,7 +45,6 @@ instance KESAlgorithm NeverKES where
 
   totalPeriodsKES _ = 0
 
-  seedSizeKES     _ = 0
   genKeyKES       _ = NeverUsedSignKeyKES
 
   sizeVerKeyKES  _ = 0

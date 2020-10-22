@@ -44,8 +44,9 @@ library
                      , data-fix
                      , digest
                      , formatting
+                     , nothunks
                      , primitive
-                     , recursion-schemes
+                     , recursion-schemes  >= 5.1   && < 5.2
                      , safe-exceptions
                      , tagged
                      , text
